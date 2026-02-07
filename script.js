@@ -6,9 +6,10 @@ const sendButton = document.getElementById('sendButton');
 const API_ENDPOINT = '/api/chat';
 const REPLY_ENDPOINT = '/api/get-reply';
 
-// Store session ID
+// Store session ID and tracking
 let currentSessionId = null;
 let pollingInterval = null;
+let lastReceivedMessageId = 0;
 
 // Add message to chat
 function addMessage(text, isUser = false) {
@@ -71,7 +72,7 @@ async function checkForReply() {
     if (!currentSessionId) return;
     
     try {
-        const response = await fetch(`${REPLY_ENDPOINT}?sessionId=${currentSessionId}`);
+        const response = await fetch(`${REPLY_ENDPOINT}?sessionId=${currentSessionId}&lastMsgId=${lastReceivedMessageId}`);
         const data = await response.json();
         
         if (data.hasReply) {
@@ -81,11 +82,13 @@ async function checkForReply() {
             // Show Amir's reply
             addMessage(data.reply);
             
-            // Stop polling after receiving a reply
-            if (pollingInterval) {
-                clearInterval(pollingInterval);
-                pollingInterval = null;
+            // Track this message so we don't show it again
+            if (data.messageId) {
+                lastReceivedMessageId = data.messageId;
             }
+            
+            // Keep polling for additional replies (don't stop)
+            // Now supports multi-turn conversations!
         }
     } catch (error) {
         console.error('Error checking for reply:', error);

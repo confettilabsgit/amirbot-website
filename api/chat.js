@@ -2,31 +2,6 @@
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-// Send message to Telegram using fetch
-async function sendToTelegram(text, sessionId) {
-    const messageText = `Website Visitor:\n\n${text}\n\nSession: ${sessionId}`;
-    
-    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-    
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            chat_id: TELEGRAM_CHAT_ID,
-            text: messageText,
-        }),
-    });
-    
-    if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(`Telegram API error: ${response.status} - ${errorData}`);
-    }
-    
-    return await response.json();
-}
-
 module.exports = async (req, res) => {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -62,14 +37,25 @@ module.exports = async (req, res) => {
             });
         }
         
-        // Generate session ID
-        const sessionId = Date.now().toString();
+        // Generate session ID (shorter format)
+        const sessionId = Date.now().toString().slice(-6);
         
-        // Forward to Telegram
+        // Forward to Telegram with prominent session ID
         let telegramSuccess = false;
         let telegramError = null;
         try {
-            await sendToTelegram(message, sessionId);
+            // Enhanced message with clear session identifier
+            const enhancedMessage = `🆔 SESSION: #${sessionId}\n━━━━━━━━━━━━━━━━\n${message}\n━━━━━━━━━━━━━━━━\n💬 Reply to this person by typing your message.\nInclude #${sessionId} to reply to this specific visitor.`;
+            
+            await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: TELEGRAM_CHAT_ID,
+                    text: enhancedMessage,
+                }),
+            });
+            
             console.log(`Message sent to Telegram. Session: ${sessionId}`);
             telegramSuccess = true;
         } catch (error) {

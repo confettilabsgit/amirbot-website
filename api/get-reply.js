@@ -5,9 +5,6 @@
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-// Track the last message we processed to avoid duplicates
-let lastProcessedMessageId = global.lastProcessedMsgId || 0;
-
 module.exports = async (req, res) => {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -23,7 +20,8 @@ module.exports = async (req, res) => {
     }
     
     try {
-        const { sessionId, lastCheck } = req.query;
+        const { sessionId, lastMsgId } = req.query;
+        const lastSeenMessageId = parseInt(lastMsgId || '0');
         
         // Get recent messages from Telegram bot chat
         const updatesUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=-1&limit=10`;
@@ -48,16 +46,14 @@ module.exports = async (req, res) => {
                     const messageTime = update.message.date * 1000; // Convert to ms
                     const now = Date.now();
                     
-                    // Check if message is recent (within last 2 minutes)
-                    // and we haven't sent it before
-                    if (now - messageTime < 2 * 60 * 1000 && messageId > lastProcessedMessageId) {
-                        lastProcessedMessageId = messageId;
-                        global.lastProcessedMsgId = messageId;
-                        
+                    // Check if message is recent (within last 5 minutes)
+                    // and newer than what this visitor has already seen
+                    if (now - messageTime < 5 * 60 * 1000 && messageId > lastSeenMessageId) {
                         return res.status(200).json({
                             hasReply: true,
                             reply: update.message.text,
-                            timestamp: messageTime
+                            timestamp: messageTime,
+                            messageId: messageId
                         });
                     }
                 }
