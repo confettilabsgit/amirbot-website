@@ -2,8 +2,13 @@ const chatMessages = document.getElementById('chatMessages');
 const messageInput = document.getElementById('messageInput');
 const sendButton = document.getElementById('sendButton');
 
-// API endpoint (we'll set this up)
+// API endpoints
 const API_ENDPOINT = '/api/chat';
+const REPLY_ENDPOINT = '/api/get-reply';
+
+// Store session ID
+let currentSessionId = null;
+let pollingInterval = null;
 
 // Add message to chat
 function addMessage(text, isUser = false) {
@@ -61,6 +66,46 @@ function removeTypingIndicator() {
     }
 }
 
+// Poll for replies from Amir
+async function checkForReply() {
+    if (!currentSessionId) return;
+    
+    try {
+        const response = await fetch(`${REPLY_ENDPOINT}?sessionId=${currentSessionId}`);
+        const data = await response.json();
+        
+        if (data.hasReply) {
+            // Remove any existing typing indicator
+            removeTypingIndicator();
+            
+            // Show Amir's reply
+            addMessage(data.reply);
+            
+            // Stop polling after receiving a reply
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+        }
+    } catch (error) {
+        console.error('Error checking for reply:', error);
+    }
+}
+
+// Start polling for replies
+function startPolling() {
+    // Stop any existing polling
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+    }
+    
+    // Poll every 3 seconds
+    pollingInterval = setInterval(checkForReply, 3000);
+    
+    // Also check immediately
+    checkForReply();
+}
+
 // Send message
 async function sendMessage() {
     const message = messageInput.value.trim();
@@ -85,9 +130,15 @@ async function sendMessage() {
         
         const data = await response.json();
         
-        // Remove typing and show response
+        // Store session ID
+        currentSessionId = data.sessionId;
+        
+        // Remove typing and show initial response
         removeTypingIndicator();
-        addMessage(data.response || 'Sorry, I had trouble responding. Try again!');
+        addMessage(data.response || 'Message sent! Waiting for Amir to reply...');
+        
+        // Start polling for Amir's actual reply
+        startPolling();
         
     } catch (error) {
         removeTypingIndicator();
@@ -106,3 +157,10 @@ messageInput.addEventListener('keypress', (e) => {
 
 // Focus input on load
 messageInput.focus();
+
+// Clean up polling when page is closed
+window.addEventListener('beforeunload', () => {
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+    }
+});
