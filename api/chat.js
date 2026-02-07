@@ -1,3 +1,6 @@
+Here's the complete code to copy:
+
+```javascript
 // Vercel Serverless Function for Chat API
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
@@ -66,17 +69,26 @@ module.exports = async (req, res) => {
         const sessionId = Date.now().toString();
         
         // Forward to Telegram
+        let telegramSuccess = false;
+        let telegramError = null;
         try {
             await sendToTelegram(message, sessionId);
             console.log(`Message sent to Telegram. Session: ${sessionId}`);
-        } catch (telegramError) {
-            console.error('Telegram send error:', telegramError);
-            // Don't fail the request, just log it
+            telegramSuccess = true;
+        } catch (error) {
+            console.error('Telegram send error:', error);
+            telegramError = error.message;
         }
         
         return res.status(200).json({ 
             response: "Thanks for your message! Amir will get back to you shortly. 📱",
-            sessionId: sessionId
+            sessionId: sessionId,
+            debug: {
+                telegramSuccess,
+                telegramError,
+                hasToken: !!TELEGRAM_BOT_TOKEN,
+                hasChatId: !!TELEGRAM_CHAT_ID
+            }
         });
         
     } catch (error) {
@@ -86,3 +98,6 @@ module.exports = async (req, res) => {
         });
     }
 };
+```
+
+**Replace your `api/chat.js` with this code, then redeploy!**
