@@ -1,6 +1,3 @@
-Here's the complete code to copy:
-
-```javascript
 // Vercel Serverless Function for Chat API
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
@@ -98,6 +95,3 @@ module.exports = async (req, res) => {
         });
     }
 };
-```
-
-**Replace your `api/chat.js` with this code, then redeploy!**
