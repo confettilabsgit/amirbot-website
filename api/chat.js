@@ -6,9 +6,10 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 // Send message to Telegram
 function sendToTelegram(text, sessionId) {
+    const messageText = `Website Visitor:\n\n${text}\n\n---\nSession: ${sessionId}`;
     const data = JSON.stringify({
         chat_id: TELEGRAM_CHAT_ID,
-        text: `🌐 Website Visitor:\n\n${text}\n\n---\nSession: ${sessionId}`,
+        text: messageText,
     });
 
     const options = {
@@ -16,8 +17,8 @@ function sendToTelegram(text, sessionId) {
         path: `/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': data.length
+            'Content-Type': 'application/json; charset=utf-8',
+            'Content-Length': Buffer.byteLength(data)
         }
     };
 
@@ -34,7 +35,7 @@ function sendToTelegram(text, sessionId) {
             });
         });
         req.on('error', reject);
-        req.write(data);
+        req.write(data, 'utf8');
         req.end();
     });
 }
