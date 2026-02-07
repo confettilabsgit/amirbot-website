@@ -1,9 +1,5 @@
 // api/telegram-webhook.js
-// Receives your replies from Telegram and stores them
-
-// Simple in-memory storage (resets on cold start, but works for MVP)
-// For production, use Vercel KV or a database
-const replies = new Map();
+// Receives your replies from Telegram and stores them in KVdb
 
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
@@ -20,21 +16,24 @@ module.exports = async (req, res) => {
             
             // Check if this is YOUR chat ID
             if (chatId === process.env.TELEGRAM_CHAT_ID) {
-                // Extract session ID if the message is a reply
-                // Or just store as the latest reply for now
-                const replyText = messageText;
-                
-                // Store the reply with timestamp
                 const replyData = {
-                    text: replyText,
+                    text: messageText,
                     timestamp: Date.now(),
                     messageId: update.message.message_id
                 };
                 
-                // Store as "latest reply" - simple approach
-                replies.set('latest', replyData);
+                // Store in KVdb (free external storage)
+                const kvdbUrl = 'https://kvdb.io/9LmYr6YNVSUVgvXMNpP4d5/amirbot_latest_reply';
                 
-                console.log('Stored reply:', replyData);
+                await fetch(kvdbUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(replyData),
+                });
+                
+                console.log('Stored reply in KVdb:', replyData);
             }
         }
         
@@ -45,6 +44,3 @@ module.exports = async (req, res) => {
         return res.status(200).json({ ok: true }); // Always return 200 to Telegram
     }
 };
-
-// Export the replies map for other functions to access
-module.exports.replies = replies;
