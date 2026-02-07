@@ -1,5 +1,12 @@
 // api/get-reply.js
 // Website polls this to check if you've replied
+// Checks Telegram directly for your recent messages
+
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+// Track the last message we processed to avoid duplicates
+let lastProcessedMessageId = global.lastProcessedMsgId || 0;
 
 module.exports = async (req, res) => {
     // CORS headers
@@ -16,51 +23,54 @@ module.exports = async (req, res) => {
     }
     
     try {
-        const { sessionId } = req.query;
+        const { sessionId, lastCheck } = req.query;
         
-        // Fetch from KVdb
-        const kvdbUrl = 'https://kvdb.io/9LmYr6YNVSUVgvXMNpP4d5/amirbot_latest_reply';
+        // Get recent messages from Telegram bot chat
+        const updatesUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=-1&limit=10`;
         
-        const response = await fetch(kvdbUrl);
+        const response = await fetch(updatesUrl);
         
         if (!response.ok) {
-            return res.status(200).json({ 
-                hasReply: false 
-            });
+            return res.status(200).json({ hasReply: false });
         }
         
-        const latestReply = await response.json();
+        const data = await response.json();
         
-        if (!latestReply || !latestReply.text) {
-            return res.status(200).json({ 
-                hasReply: false 
-            });
+        // Look for messages from you (not from bot) sent recently
+        if (data.ok && data.result && data.result.length > 0) {
+            for (const update of data.result.reverse()) {
+                if (update.message && 
+                    update.message.text && 
+                    !update.message.from.is_bot &&
+                    update.message.chat.id.toString() === TELEGRAM_CHAT_ID) {
+                    
+                    const messageId = update.message.message_id;
+                    const messageTime = update.message.date * 1000; // Convert to ms
+                    const now = Date.now();
+                    
+                    // Check if message is recent (within last 2 minutes)
+                    // and we haven't sent it before
+                    if (now - messageTime < 2 * 60 * 1000 && messageId > lastProcessedMessageId) {
+                        lastProcessedMessageId = messageId;
+                        global.lastProcessedMsgId = messageId;
+                        
+                        return res.status(200).json({
+                            hasReply: true,
+                            reply: update.message.text,
+                            timestamp: messageTime
+                        });
+                    }
+                }
+            }
         }
         
-        // Check if this reply is recent (within last 5 minutes)
-        const age = Date.now() - latestReply.timestamp;
-        const maxAge = 5 * 60 * 1000; // 5 minutes
-        
-        if (age > maxAge) {
-            return res.status(200).json({ 
-                hasReply: false 
-            });
-        }
-        
-        // Return the reply and delete it from KVdb (so it's only sent once)
-        await fetch(kvdbUrl, { method: 'DELETE' });
-        
-        return res.status(200).json({ 
-            hasReply: true,
-            reply: latestReply.text,
-            timestamp: latestReply.timestamp
-        });
+        return res.status(200).json({ hasReply: false });
         
     } catch (error) {
         console.error('Get reply error:', error);
         return res.status(200).json({ 
             hasReply: false,
-            error: 'Internal server error' 
+            error: error.message 
         });
     }
 };
