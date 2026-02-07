@@ -2,10 +2,10 @@
   "name": "amirbot-website",
   "version": "1.0.0",
   "description": "AmirBot - Your friendly AI companion",
-  "main": "server.js",
+  "main": "server-telegram.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server-telegram.js",
+    "dev": "node server-telegram.js"
   },
   "keywords": ["chatbot", "ai", "openclaw"],
   "author": "Amir",
