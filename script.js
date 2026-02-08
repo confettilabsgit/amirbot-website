@@ -10,6 +10,8 @@ const REPLY_ENDPOINT = '/api/get-reply';
 let currentSessionId = null;
 let pollingInterval = null;
 let lastReceivedMessageId = 0;
+let offlineTimeout = null;
+let hasReceivedReply = false;
 
 // Add message to chat
 function addMessage(text, isUser = false) {
@@ -79,6 +81,15 @@ async function checkForReply() {
             // Remove any existing typing indicator
             removeTypingIndicator();
             
+            // Mark that we got a reply
+            hasReceivedReply = true;
+            
+            // Cancel the offline timeout
+            if (offlineTimeout) {
+                clearTimeout(offlineTimeout);
+                offlineTimeout = null;
+            }
+            
             // Show Amir's reply
             addMessage(data.reply);
             
@@ -109,20 +120,40 @@ function startPolling() {
     checkForReply();
 }
 
+// Show offline message after 30 seconds
+function scheduleOfflineMessage() {
+    // Clear any existing timeout
+    if (offlineTimeout) {
+        clearTimeout(offlineTimeout);
+    }
+    
+    // Set 30-second timeout
+    offlineTimeout = setTimeout(() => {
+        // Only show offline message if no reply was received
+        if (!hasReceivedReply) {
+            removeTypingIndicator();
+            addMessage('AmirBot is offline now but check back for a response later.');
+        }
+    }, 30000); // 30 seconds
+}
+
 // Send message
 async function sendMessage() {
     const message = messageInput.value.trim();
     if (!message) return;
     
+    // Reset reply tracking
+    hasReceivedReply = false;
+    
     // Add user message
     addMessage(message, true);
     messageInput.value = '';
     
-    // Show typing
+    // Show typing immediately
     showTypingIndicator();
     
     try {
-        // Send to backend
+        // Send to backend (sends to Telegram)
         const response = await fetch(API_ENDPOINT, {
             method: 'POST',
             headers: {
@@ -136,12 +167,12 @@ async function sendMessage() {
         // Store session ID
         currentSessionId = data.sessionId;
         
-        // Remove typing and show initial response
-        removeTypingIndicator();
-        addMessage(data.response || 'Message sent! Waiting for Amir to reply...');
-        
+        // Don't show the auto-reply anymore - just keep typing indicator
         // Start polling for Amir's actual reply
         startPolling();
+        
+        // Schedule offline message after 30 seconds if no reply
+        scheduleOfflineMessage();
         
     } catch (error) {
         removeTypingIndicator();
@@ -165,5 +196,8 @@ messageInput.focus();
 window.addEventListener('beforeunload', () => {
     if (pollingInterval) {
         clearInterval(pollingInterval);
+    }
+    if (offlineTimeout) {
+        clearTimeout(offlineTimeout);
     }
 });
